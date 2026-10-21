@@ -6,6 +6,7 @@ from pathlib import Path
 # ---------------- Configuration ----------------
 WEATHER_PATH = Path("./data/weather/sweden_weekly_weather.parquet")
 OBSERVATIONS_PATH = Path("./data/observations/observations.parquet")
+PLACENAMES_PATH = Path("./data/placenames/cell_placenames.parquet")
 GRID_PATH = Path("./data/sweden_master_grid.csv")
 OUTPUT_PATH = Path("./data/processed/cell_week_dataset.parquet")
 
@@ -17,19 +18,20 @@ EXPECTED_ROWS = 8057511
 weather = pd.read_parquet(WEATHER_PATH)
 observations = pd.read_parquet(OBSERVATIONS_PATH, columns = ["cell_id", "year", "week"])
 grid = pd.read_csv(GRID_PATH, usecols = ["cell_id", "forest_pct"], dtype = {"cell_id": "str"})
+placenames = pd.read_parquet(PLACENAMES_PATH, columns = ["cell_id", "placename_count"])
 print(f"Loaded {len(weather):,} weather records.")
 print(f"Loaded {len(observations):,} observations.")
+print(f"Loaded forest coverage for {len(grid):,} cells.")
+print(f"Loaded placename counts for {len(placenames):,} cells.")
 
-# ---------------- Validate weather and forest coverage ----------------
+# ---------------- Validate data ----------------
 keys = ["cell_id", "year", "week"]
-
 assert len(weather) == EXPECTED_ROWS
 assert weather["cell_id"].nunique() == EXPECTED_CELLS
 assert not weather.duplicated(keys).any()
 assert not weather.isna().any().any()
 
 n_weeks = weather[["year", "week"]].drop_duplicates().shape[0]
-
 assert n_weeks == EXPECTED_WEEKS
 assert len(weather) == EXPECTED_CELLS * n_weeks
 
@@ -37,10 +39,12 @@ assert len(grid) == EXPECTED_CELLS
 assert grid["cell_id"].is_unique
 assert grid["forest_pct"].notna().all()
 assert grid["forest_pct"].between(0, 100).all()
-
 grid["forest_pct"] = grid["forest_pct"].astype("float32")
 
-print(f"Loaded forest coverage for {len(grid):,} cells.")
+assert len(placenames) == EXPECTED_CELLS
+assert placenames["cell_id"].is_unique
+assert placenames["placename_count"].notna().all()
+assert placenames["placename_count"].ge(0).all()
 
 # ---------------- Create observation labels ----------------
 # Multiple observations in the same cell-week should produce only one positive label.
@@ -93,26 +97,16 @@ df["week_sin"] = np.sin(angle).astype("float32")
 df["week_cos"] = np.cos(angle).astype("float32")
 
 # ---------------- Add static cell features ----------------
+# Add forest_pct
 # validate = many_to_one ensures that each cell-week matches at most one grid record.
 df = df.merge(grid, on = "cell_id", how = "left", validate = "many_to_one")
-
 assert df["forest_pct"].notna().all()
 
-# Placename count is a future addition:
-#
-# placenames = pd.read_parquet(
-#     "./data/placenames/cell_placename_counts.parquet"
-# )
-#
-# df = df.merge(
-#     placenames[["cell_id", "placename_count"]],
-#     on="cell_id",
-#     how="left",
-#     validate="many_to_one"
-# )
-#
-# assert df["placename_count"].notna().all()
-# df["placename_count"] = df["placename_count"].astype("int32")
+# Add placename_count
+df = df.merge(placenames, on = "cell_id", how = "left", validate = "many_to_one")
+assert len(df) == EXPECTED_ROWS
+assert df["placename_count"].notna().all()
+df["placename_count"] = (df["placename_count"].astype("int32"))
 
 # ---------------- Finalize ----------------
 df = df[
@@ -125,14 +119,16 @@ df = df[
         "observation",
         "temp_7d",
         "precip_7d",
-        "forest_pct"
+        "forest_pct",
+        "placename_count"
     ]
-] # REMEMBER TO ADD "placename_count" LATER!
+] 
 # Save space by using small datatypes
 df["year"] = df["year"].astype("int16")
 df["week"] = df["week"].astype("int8")
 df["temp_7d"] = df["temp_7d"].astype("float32")
 df["precip_7d"] = df["precip_7d"].astype("float32")
+df["placename_count"] = df["placename_count"].astype("int16")
 
 # Check that the final data makes sense.
 assert len(df) == EXPECTED_ROWS

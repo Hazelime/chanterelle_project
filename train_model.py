@@ -40,6 +40,22 @@ MODEL_FEATURES = {
         "temp_7d",
         "precip_7d",
         "forest_pct"
+    ],
+    "placename_count": [
+        "week_sin",
+        "week_cos",
+        "temp_7d",
+        "precip_7d",
+        "forest_pct",
+        "placename_count",
+    ],
+    "placename_count_log": [
+        "week_sin",
+        "week_cos",
+        "temp_7d",
+        "precip_7d",
+        "forest_pct",
+        "placename_count_log",
     ]
 }
 
@@ -57,7 +73,16 @@ def load_data(features: list) -> DataFrame:
     """
     # The asterisk (*) unpacks features
     columns = ["cell_id", "year", "observation", *features]
-    df = pd.read_parquet(DATA_PATH, columns = list(dict.fromkeys(columns)))
+    # The log feature is derived from placename_count, so load the original column instead.
+    read_columns = ["placename_count" if col == "placename_count_log" else col for col in columns]
+
+    df = pd.read_parquet(DATA_PATH, columns = list(dict.fromkeys(read_columns)))
+
+    # Calculate placename_count_log = ln(1 + placename_count). The +1 handles cell
+    # cells with zero placenames.
+    if "placename_count_log" in features:
+        assert df["placename_count"].ge(0).all()
+        df["placename_count_log"] = np.log1p(df["placename_count"]).astype("float32")
 
     # Make sure the data makes sense before continuing.
     assert df["observation"].isin([0, 1]).all()
