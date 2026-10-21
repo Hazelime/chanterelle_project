@@ -12,13 +12,14 @@ FIGURE_DIR = RESULT_DIR / "figures"
 
 SCHEMES = ["temporal", "spatial", "spatiotemporal"]
 
-MODEL_ORDER = ["seasonality", "environmental", "placename_count", "tfidf", "fasttext"]
+MODEL_ORDER = ["seasonality", "environmental", "placename_count", "placename_count_log", "tfidf", "fasttext"]
 
 COMPARISONS = [
     ("seasonality", "environmental"),
     ("environmental", "placename_count"),
-    ("placename_count", "tfidf"),
-    ("placename_count", "fasttext")
+    ("placename_count", "placename_count_log"),
+    ("placename_count_log", "tfidf"),
+    ("placename_count_log", "fasttext")
 ]
 
 
