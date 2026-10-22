@@ -2,6 +2,7 @@ import argparse # Used for user input in Main
 from pathlib import Path
 
 import numpy as np
+import numpy.typing as npt
 import pandas as pd
 
 from sklearn.linear_model import LogisticRegression
@@ -10,9 +11,15 @@ from sklearn.pipeline import make_pipeline
 from sklearn.preprocessing import StandardScaler
 from sklearn.pipeline import Pipeline
 
+from scipy.sparse import csr_matrix
+
+from tfidf_features import build_documents, fit_tfidf
+from tfidf_model import CellTfidfLogisticRegression
+
 
 # ---------------- Configuration ----------------
 DATA_PATH = Path("./data/processed/cell_week_dataset.parquet")
+PLACENAMES_PATH = Path("./data/placenames/cell_placenames.parquet")
 
 SPLIT_DIR = Path("./data/splits")
 RESULT_DIR = Path("./results")
@@ -58,6 +65,14 @@ MODEL_FEATURES = {
         "placename_count_log",
     ]
 }
+TFIDF_NUMERIC_FEATURES = [
+    "week_sin",
+    "week_cos",
+    "temp_7d",
+    "precip_7d",
+    "forest_pct",
+    "placename_count_log",
+]
 
 
 def load_data(features: list) -> DataFrame:
@@ -160,6 +175,7 @@ def evaluate(model: Pipeline, X: DataFrame, y: DataFrame) -> dict:
             A dict containing the average precision, prevalance, raw number of positives,
             and number of rows for the given model and dataset.
     """
+    # The second column is the probability of at least one recorded observation.
     scores = model.predict_proba(X)[:, 1]
 
     return {
@@ -177,8 +193,8 @@ def run_experiment(df: DataFrame,
                    seed: int | None = None,
                    fixed_C: float | None = None) -> dict:
     """
-    Run an experiment for a given dataset, set of features, scheme, seed, and 
-    list of potential regularization strengths (C).
+    Run an experiment for a given dataset, set of features, scheme, and -- optionally --
+    a seed and a fixed regularization strengths (C).
 
     Parameters:
         df: DataFrame
@@ -266,6 +282,152 @@ def run_experiment(df: DataFrame,
     return result
 
 
+def prepare_tfidf(df: DataFrame,
+                  train_mask: npt.NDArray[np.bool_]) -> tuple[csr_matrix, npt.NDArray[np.int32], TfidfVectorizer]:
+    """
+    Fit a TF-IDF vectorizer on training data and build TF-IDF features for all cells.
+    
+    Parameters:
+        df: DataFrame
+            The data.
+        train_mask: npt.NDArray[np.bool_]
+            A mask to indicate which data should be used (= training data).
+    
+    Returns:
+        csr_matrix
+            The TF-IDF features for all cells (train + val + test).
+        npt.NDArray[np.int32]
+            A mapping from cell_id to the row index in the CSR matrix.
+        TfidfVectorizer
+            A Scikit-learn TF-IDF vectorizer fitted on the training data.
+    """
+    placenames = pd.read_parquet(PLACENAMES_PATH, columns = ["cell_id", "placenames"])
+    documents = build_documents(placenames) # Custom-made function
+
+    assert documents["cell_id"].is_unique
+    assert set(df["cell_id"].unique()) == set(documents["cell_id"])
+
+    # Sort so cell_index will align with the rows of V later.
+    documents = documents.sort_values("cell_id").reset_index(drop = True)
+    # Create a stable mapping from cell_id to TF-IDF feature.
+    cell_index = pd.Series(np.arange(len(documents),
+                                     dtype = np.int32),
+                                     index = documents["cell_id"])
+    observation_cell_idx = (df["cell_id"].map(cell_index).to_numpy(dtype = np.int32))
+
+    # Fit on unique training cells only.
+    training_cell_indices = np.unique(observation_cell_idx[train_mask])
+    training_documents = (documents.iloc[training_cell_indices]["document"])
+    # Use Scikit-learn's TF-IDF vectorizer.
+    vectorizer, _ = fit_tfidf(training_documents)
+
+    # Transform the documents for all cells into TF-IDF features using
+    # the vectorizer that was fitted on training data. Save the results
+    # in a sparse matrix.
+    V = vectorizer.transform(documents["document"]).tocsr()
+
+    return V, observation_cell_idx, vectorizer
+
+
+def run_tfidf_experiment(df: DataFrame, scheme: str, seed: int = None) -> dict:
+    """
+    A TF-IDF version of run_experiment().
+
+    Parameters:
+        df: DataFrame
+            The data with which to train, validate, and test a model.
+        scheme: str
+            What type of validation scheme to run (temporal, spatial, or spatiotemporal)
+        seed: int | None
+            The randomizer seed for spatial and spatiotemporal validation. Temporal
+            validation does not require any seed.
+    Returns:
+        dict
+            A dict with metadata and results from the experiment, including scheme,
+            seed, best_C, val_ap, val_prevalence, val_positives, test_ap, test_prevalance,
+            and test_positives. 
+    """
+    print(f"\nRunning TF-IDF: {scheme}, seed = {seed}")
+
+    labels = get_splits(df, scheme, seed)
+
+    train_mask = (labels == "train").to_numpy()
+    val_mask = (labels == "val").to_numpy()
+    test_mask = (labels == "test").to_numpy()
+
+    X = df[TFIDF_NUMERIC_FEATURES].to_numpy(dtype = np.float32)
+    y = df["observation"].to_numpy(dtype = np.int8)
+
+    V, cell_idx, vectorizer = prepare_tfidf(df = df, train_mask = train_mask)
+
+    X_train = X[train_mask]
+    X_val = X[val_mask]
+    X_test = X[test_mask]
+
+    y_train = y[train_mask]
+    y_val = y[val_mask]
+    y_test = y[test_mask]
+
+    idx_train = cell_idx[train_mask]
+    idx_val = cell_idx[val_mask]
+    idx_test = cell_idx[test_mask]
+
+    assert y_train.sum() > 0
+    assert y_val.sum() > 0
+    assert y_test.sum() > 0
+
+    best_C = None
+    best_val_ap = -np.inf
+
+    # ---------------- Hyperparameter selection ----------------
+    for C in C_VALUES:
+        model = CellTfidfLogisticRegression(C = C, max_iter = 1000, tol = 1e-8)
+        model.fit(X_train, idx_train, V, y_train)
+
+        if not model.success_:
+            raise RuntimeError(f"TF-IDF optimizer failed for C = {C}: {model.message_}")
+
+        val_scores = model.predict_proba(X_val, idx_val, V)[:, 1]
+        val_ap = average_precision_score(y_val, val_scores)
+        print(f"  C = {C}: validation AP = {val_ap:.6f}")
+
+        if val_ap > best_val_ap:
+            best_val_ap = val_ap
+            best_C = C
+    
+    # ---------------- Final model ----------------
+    # Refit the best model and use it as the final model.
+    model = CellTfidfLogisticRegression(C = best_C, max_iter = 1000, tol = 1e-8)
+    model.fit(X_train, idx_train, V, y_train)
+
+    if not model.success_:
+        raise RuntimeError(f"Final TF-IDF fit failed: {model.message_}")
+
+    val_scores = model.predict_proba(X_val, idx_val, V)[:, 1]
+    test_scores = model.predict_proba(X_test, idx_test, V)[:, 1]
+
+    result = {
+        "scheme": scheme,
+        "seed": seed,
+        "best_C": best_C,
+        "val_ap": average_precision_score(y_val, val_scores),
+        "val_prevalence": float(y_val.mean()),
+        "val_positives": int(y_val.sum()),
+        "test_ap": average_precision_score(y_test, test_scores),
+        "test_prevalence": float(y_test.mean()),
+        "test_positives": int(y_test.sum()),
+    }
+
+    print("Converged:", model.success_)
+    print("Iterations:", model.n_iter_)
+    print(f"Final loss: {model.final_loss_:.8f}")
+    print(f"Gradient infinity norm: {model.final_gradient_norm_:.2e}")
+    print(f"Selected C: {best_C}")
+    print(f"Test AP: {result['test_ap']:.6f}")
+
+    return result
+
+
 if __name__ == "__main__":
     # Let the user choose what kind of experiment to run by adding flags:
     # --model with one of (seasonality, environmental) to choose which features to include
@@ -275,7 +437,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument(
         "--model",
-        choices = list(MODEL_FEATURES.keys()),
+        choices = [MODEL_FEATURES.keys(), "tfidf"],
         required = True
     )
     parser.add_argument(
@@ -287,7 +449,10 @@ if __name__ == "__main__":
     model_name = args.model
     scheme = args.scheme
 
-    features = MODEL_FEATURES[model_name]
+    if model_name == "tfidf":
+        features = TFIDF_NUMERIC_FEATURES
+    else:
+        features = MODEL_FEATURES[model_name]
     
     print(f"\nModel: {model_name}")
     print(f"Evaluation: {scheme}")
@@ -299,17 +464,16 @@ if __name__ == "__main__":
     df = load_data(features)
     results = []
 
-    if args.scheme == "temporal":
-        # Takes like 15 seconds on my laptop.
-        results.append(run_experiment(df, features, "temporal"))
-    elif args.scheme == "spatial":
-        # Takes about 2-3 minutes on my laptop.
+    runner = (run_tfidf_experiment if model_name == "tfidf" else None)
+    if scheme == "temporal":
+        # Takes like 15 seconds for normal features and 2 min for TF-IDF.
+        if runner: results.append(runner(df, "temporal"))
+        else: results.append(run_experiment(df, features, "temporal"))
+    elif scheme in ["spatial", "spatiotemporal"]:
+        # Takes about 2-3 minutes for normal features and 10 min for TF-IDF.
         for seed in SEEDS:
-            results.append(run_experiment(df, features, "spatial", seed))
-    elif args.scheme == "spatiotemporal":
-        # Takes about 2-3 minutes on my laptop.
-        for seed in SEEDS:
-            results.append(run_experiment(df, features, "spatiotemporal", seed))
+            if runner: results.append(runner(df, scheme, seed))
+            else: results.append(run_experiment(df, features, scheme, seed))
 
     results_df = pd.DataFrame(results)
 
