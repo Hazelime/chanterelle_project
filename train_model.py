@@ -16,11 +16,13 @@ from scipy.sparse import csr_matrix
 from tfidf_features import build_documents, fit_tfidf
 from tfidf_model import CellTfidfLogisticRegression
 
+import joblib
+
 
 # ---------------- Configuration ----------------
 DATA_PATH = Path("./data/processed/cell_week_dataset.parquet")
 PLACENAMES_PATH = Path("./data/placenames/cell_placenames.parquet")
-
+MODEL_DIR = Path("./results/models")
 SPLIT_DIR = Path("./data/splits")
 RESULT_DIR = Path("./results")
 
@@ -405,6 +407,14 @@ def run_tfidf_experiment(df: DataFrame, scheme: str, seed: int = None) -> dict:
 
     val_scores = model.predict_proba(X_val, idx_val, V)[:, 1]
     test_scores = model.predict_proba(X_test, idx_test, V)[:, 1]
+
+    # Save the temporal model (which covers all cells) for coefficient analysis.
+    if scheme == "temporal": MODEL_DIR.mkdir(parents = True, exist_ok = True)
+    joblib.dump({"model": model,
+                 "vectorizer": vectorizer,
+                 "features": TFIDF_NUMERIC_FEATURES},
+                 MODEL_DIR / "tfidf_temporal.joblib")
+    print("Saved temporal TF-IDF model.")
 
     result = {
         "scheme": scheme,
