@@ -14,7 +14,7 @@ from sklearn.pipeline import Pipeline
 from scipy.sparse import csr_matrix
 
 from tfidf_features import build_documents, fit_tfidf
-from tfidf_model import CellTfidfLogisticRegression
+from cell_feature_model import CellFeatureLogisticRegression
 
 import joblib
 
@@ -22,6 +22,7 @@ import joblib
 # ---------------- Configuration ----------------
 DATA_PATH = Path("./data/processed/cell_week_dataset.parquet")
 PLACENAMES_PATH = Path("./data/placenames/cell_placenames.parquet")
+FASTTEXT_PATH = Path("./data/placenames/cell_fasttext_embeddings.parquet")
 MODEL_DIR = Path("./results/models")
 SPLIT_DIR = Path("./data/splits")
 RESULT_DIR = Path("./results")
@@ -67,7 +68,7 @@ MODEL_FEATURES = {
         "placename_count_log",
     ]
 }
-TFIDF_NUMERIC_FEATURES = [
+NUMERIC_FEATURES = [
     "week_sin",
     "week_cos",
     "temp_7d",
@@ -188,7 +189,6 @@ def evaluate(model: Pipeline, X: DataFrame, y: DataFrame) -> dict:
     }
 
 
-# ---------------- Run one experiment ----------------
 def run_experiment(df: DataFrame,
                    features: list,
                    scheme: str,
@@ -331,15 +331,21 @@ def prepare_tfidf(df: DataFrame,
     return V, observation_cell_idx, vectorizer
 
 
-def run_tfidf_experiment(df: DataFrame, scheme: str, seed: int = None) -> dict:
+def run_linguistic_experiment(df: DataFrame,
+                              scheme: str,
+                              model_name: str,
+                              seed: int = None) -> dict:
     """
-    A TF-IDF version of run_experiment().
+    A version of run_experiment() which uses the custom-made CellFeatureLogisticRegression
+    for TF-IDF and FastText models.
 
     Parameters:
         df: DataFrame
             The data with which to train, validate, and test a model.
         scheme: str
             What type of validation scheme to run (temporal, spatial, or spatiotemporal)
+        model_name: str
+            The type of model used for the experiment (tfidf or fasttext)
         seed: int | None
             The randomizer seed for spatial and spatiotemporal validation. Temporal
             validation does not require any seed.
@@ -349,7 +355,7 @@ def run_tfidf_experiment(df: DataFrame, scheme: str, seed: int = None) -> dict:
             seed, best_C, val_ap, val_prevalence, val_positives, test_ap, test_prevalance,
             and test_positives. 
     """
-    print(f"\nRunning TF-IDF: {scheme}, seed = {seed}")
+    print(f"\nRunning {model_name}: {scheme}, seed = {seed}")
 
     labels = get_splits(df, scheme, seed)
 
@@ -357,11 +363,17 @@ def run_tfidf_experiment(df: DataFrame, scheme: str, seed: int = None) -> dict:
     val_mask = (labels == "val").to_numpy()
     test_mask = (labels == "test").to_numpy()
 
-    X = df[TFIDF_NUMERIC_FEATURES].to_numpy(dtype = np.float32)
+    X = df[NUMERIC_FEATURES].to_numpy(dtype = np.float32)
     y = df["observation"].to_numpy(dtype = np.int8)
 
-    V, cell_idx, vectorizer = prepare_tfidf(df = df, train_mask = train_mask)
-
+    if model_name == "tfidf":
+        V, cell_idx, vectorizer = prepare_tfidf(df = df, train_mask = train_mask)
+    elif model_name == "fasttext":
+        V, cell_idx = prepare_fasttext(df)
+        vectorizer = None
+    else:
+        raise ValueError(f"Unknown linguistic model: {model_name}")
+    
     X_train = X[train_mask]
     X_val = X[val_mask]
     X_test = X[test_mask]
@@ -383,11 +395,11 @@ def run_tfidf_experiment(df: DataFrame, scheme: str, seed: int = None) -> dict:
 
     # ---------------- Hyperparameter selection ----------------
     for C in C_VALUES:
-        model = CellTfidfLogisticRegression(C = C, max_iter = 1000, tol = 1e-8)
+        model = CellFeatureLogisticRegression(C = C, max_iter = 1000, tol = 1e-8)
         model.fit(X_train, idx_train, V, y_train)
 
         if not model.success_:
-            raise RuntimeError(f"TF-IDF optimizer failed for C = {C}: {model.message_}")
+            raise RuntimeError(f"Model optimizer failed for C = {C}: {model.message_}")
 
         val_scores = model.predict_proba(X_val, idx_val, V)[:, 1]
         val_ap = average_precision_score(y_val, val_scores)
@@ -399,22 +411,24 @@ def run_tfidf_experiment(df: DataFrame, scheme: str, seed: int = None) -> dict:
     
     # ---------------- Final model ----------------
     # Refit the best model and use it as the final model.
-    model = CellTfidfLogisticRegression(C = best_C, max_iter = 1000, tol = 1e-8)
+    model = CellFeatureLogisticRegression(C = best_C, max_iter = 1000, tol = 1e-8)
     model.fit(X_train, idx_train, V, y_train)
 
     if not model.success_:
-        raise RuntimeError(f"Final TF-IDF fit failed: {model.message_}")
+        raise RuntimeError(f"Final model fit failed: {model.message_}")
 
     val_scores = model.predict_proba(X_val, idx_val, V)[:, 1]
     test_scores = model.predict_proba(X_test, idx_test, V)[:, 1]
 
-    # Save the temporal model (which covers all cells) for coefficient analysis.
-    if scheme == "temporal": MODEL_DIR.mkdir(parents = True, exist_ok = True)
-    joblib.dump({"model": model,
-                 "vectorizer": vectorizer,
-                 "features": TFIDF_NUMERIC_FEATURES},
-                 MODEL_DIR / "tfidf_temporal.joblib")
-    print("Saved temporal TF-IDF model.")
+    # Save the TF-IDF temporal model (which covers all cells) for coefficient analysis.
+    if model_name == "tfidf":
+        if scheme == "temporal":
+            MODEL_DIR.mkdir(parents = True, exist_ok = True)
+        joblib.dump({"model": model,
+                    "vectorizer": vectorizer,
+                    "features": TFIDF_NUMERIC_FEATURES},
+                    MODEL_DIR / "tfidf_temporal.joblib")
+        print("Saved temporal TF-IDF model.")
 
     result = {
         "scheme": scheme,
@@ -438,16 +452,52 @@ def run_tfidf_experiment(df: DataFrame, scheme: str, seed: int = None) -> dict:
     return result
 
 
+def prepare_fasttext(df: DataFrame) -> tuple[npt.NDArray[np.float32], npt.NDArray[np.int32]]:
+    """
+    Build FastText features for all cells.
+    
+    Parameters:
+        df: DataFrame
+            The data.
+    Returns:
+        NDArray
+            The FastText features for all cells (train + val + test).
+        npt.NDArray[np.int32]
+            A mapping from cell_id to the row index in the CSR matrix.
+    """
+    embeddings = pd.read_parquet(FASTTEXT_PATH)
+
+    assert embeddings["cell_id"].is_unique
+    assert set(df["cell_id"].unique()) == set(embeddings["cell_id"])
+
+    # Sort so cell_index will align with the rows of V later.
+    embeddings = embeddings.sort_values("cell_id").reset_index(drop = True)
+    # Create a stable mapping from cell_id to FastText feature.
+    cell_index = pd.Series(np.arange(len(embeddings),
+                                     dtype = np.int32),
+                                     index = embeddings["cell_id"])
+    observation_cell_idx = (df["cell_id"].map(cell_index).to_numpy(dtype = np.int32))
+    
+    # Put the FastText features in a dense NumPy array.
+    V = np.stack(embeddings["embedding"].to_numpy()).astype(np.float32)
+
+    assert V.shape == (4983, 300)
+    assert np.isfinite(V).all()
+
+    return V, observation_cell_idx
+
+
 if __name__ == "__main__":
     # Let the user choose what kind of experiment to run by adding flags:
-    # --model with one of (seasonality, environmental) to choose which features to include
-    # --scheme with one of (temporal, spatial, spatiotemporal) to choose type of experiment
+    # --model [seasonality, environmental, placenames, placenames_log, tfidf, fasttext]
+    #   to choose which features to include.
+    # --scheme (temporal, spatial, spatiotemporal) to choose type of experiment.
     # Both flags must be included. Sample usage:
     # python3 train_model.py --model environmental --scheme temporal
     parser = argparse.ArgumentParser()
     parser.add_argument(
         "--model",
-        choices = [MODEL_FEATURES.keys(), "tfidf"],
+        choices = [MODEL_FEATURES.keys(), "tfidf", "fasttext"],
         required = True
     )
     parser.add_argument(
@@ -459,8 +509,8 @@ if __name__ == "__main__":
     model_name = args.model
     scheme = args.scheme
 
-    if model_name == "tfidf":
-        features = TFIDF_NUMERIC_FEATURES
+    if model_name in ["tfidf", "fasttext"]:
+        features = NUMERIC_FEATURES
     else:
         features = MODEL_FEATURES[model_name]
     
@@ -474,15 +524,15 @@ if __name__ == "__main__":
     df = load_data(features)
     results = []
 
-    runner = (run_tfidf_experiment if model_name == "tfidf" else None)
+    runner = (run_linguistic_experiment if model_name in ["tfidf", "fasttext"] else None)
     if scheme == "temporal":
-        # Takes like 15 seconds for normal features and 2 min for TF-IDF.
-        if runner: results.append(runner(df, "temporal"))
+        # Takes like 15 seconds for numerical-only models and 2 min for lingusitic models.
+        if runner: results.append(runner(df, "temporal", model_name))
         else: results.append(run_experiment(df, features, "temporal"))
     elif scheme in ["spatial", "spatiotemporal"]:
-        # Takes about 2-3 minutes for normal features and 10 min for TF-IDF.
+        # Takes about 2 minutes for numerical-only models and 10 min for linguistic models.
         for seed in SEEDS:
-            if runner: results.append(runner(df, scheme, seed))
+            if runner: results.append(runner(df, scheme, model_name, seed))
             else: results.append(run_experiment(df, features, scheme, seed))
 
     results_df = pd.DataFrame(results)
