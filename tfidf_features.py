@@ -6,10 +6,11 @@ from scipy.sparse import csr_matrix
 
 
 # ---------------- Configuration ----------------
-# Character-level n-gram TF-IDF with n-grams of length 3-5, excluding n-grams
-# occuring only in one cell and treating uppercase and lowercase forms equally.
+# Character-level TF-IDF with n-grams of length 3-5 within word boundaries,
+# excluding n-grams occuring only in one cell and treating uppercase and
+# lowercase forms as the same.
 TFIDF_PARAMS = {
-    "analyzer": "char",
+    "analyzer": "char_wb",
     "ngram_range": (3, 5),
     "min_df": 2,
     "max_features": 5000,
