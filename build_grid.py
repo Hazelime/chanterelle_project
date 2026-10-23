@@ -167,6 +167,7 @@ def create_master_grid(raster_path: Path,
     indices = np.flatnonzero(land_counts > 0)
     grid_rows = indices // nx # The integer part is the row number
     grid_cols = indices % nx # The remainder part is the column number
+    # Cell_x and cell_y represent the bottom-left corner of the cell.
     cell_x = x_min + grid_cols * cell_size
     cell_y = y_min + grid_rows * cell_size
 
