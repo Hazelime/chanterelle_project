@@ -192,6 +192,7 @@ def evaluate(model: Pipeline, X: DataFrame, y: DataFrame) -> dict:
 def run_experiment(df: DataFrame,
                    features: list,
                    scheme: str,
+                   model_name: str,
                    seed: int | None = None,
                    fixed_C: float | None = None) -> dict:
     """
@@ -205,6 +206,8 @@ def run_experiment(df: DataFrame,
             The features to include in the experiment.
         scheme: str
             What type of validation scheme to run (temporal, spatial, or spatiotemporal)
+        model_name: str
+            The type of model used for the experiment (tfidf or fasttext)
         seed: int | None
             The randomizer seed for spatial and spatiotemporal validation. Temporal
             validation does not require any seed.
@@ -264,6 +267,13 @@ def run_experiment(df: DataFrame,
 
     val_result = evaluate(model, X_val, y_val)
     test_result = evaluate(model, X_test, y_test)
+
+    # Save the temporal placename_count_log model for plotting later.
+    if scheme == "temporal" and model_name == "placename_count_log":
+        MODEL_DIR.mkdir(parents = True, exist_ok = True)
+        joblib.dump({"model": model, "features": features,},
+            MODEL_DIR / "placename_count_log_temporal.joblib")
+        print("Saved temporal placename_count_log model.")
 
     result = {
         "scheme": scheme,
@@ -497,7 +507,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument(
         "--model",
-        choices = [MODEL_FEATURES.keys(), "tfidf", "fasttext"],
+        choices = [*MODEL_FEATURES.keys(), "tfidf", "fasttext"],
         required = True
     )
     parser.add_argument(
@@ -528,12 +538,12 @@ if __name__ == "__main__":
     if scheme == "temporal":
         # Takes like 15 seconds for numerical-only models and 2 min for lingusitic models.
         if runner: results.append(runner(df, "temporal", model_name))
-        else: results.append(run_experiment(df, features, "temporal"))
+        else: results.append(run_experiment(df, features, "temporal", model_name))
     elif scheme in ["spatial", "spatiotemporal"]:
         # Takes about 2 minutes for numerical-only models and 10 min for linguistic models.
         for seed in SEEDS:
             if runner: results.append(runner(df, scheme, model_name, seed))
-            else: results.append(run_experiment(df, features, scheme, seed))
+            else: results.append(run_experiment(df, features, scheme, model_name, seed))
 
     results_df = pd.DataFrame(results)
 
