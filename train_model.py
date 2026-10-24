@@ -341,6 +341,41 @@ def prepare_tfidf(df: DataFrame,
     return V, observation_cell_idx, vectorizer
 
 
+def prepare_fasttext(df: DataFrame) -> tuple[npt.NDArray[np.float32], npt.NDArray[np.int32]]:
+    """
+    Build FastText features for all cells.
+    
+    Parameters:
+        df: DataFrame
+            The data.
+    Returns:
+        NDArray
+            The FastText features for all cells (train + val + test).
+        npt.NDArray[np.int32]
+            A mapping from cell_id to the row index in the CSR matrix.
+    """
+    embeddings = pd.read_parquet(FASTTEXT_PATH)
+
+    assert embeddings["cell_id"].is_unique
+    assert set(df["cell_id"].unique()) == set(embeddings["cell_id"])
+
+    # Sort so cell_index will align with the rows of V later.
+    embeddings = embeddings.sort_values("cell_id").reset_index(drop = True)
+    # Create a stable mapping from cell_id to FastText feature.
+    cell_index = pd.Series(np.arange(len(embeddings),
+                                     dtype = np.int32),
+                                     index = embeddings["cell_id"])
+    observation_cell_idx = (df["cell_id"].map(cell_index).to_numpy(dtype = np.int32))
+    
+    # Put the FastText features in a dense NumPy array.
+    V = np.stack(embeddings["embedding"].to_numpy()).astype(np.float32)
+
+    assert V.shape == (4983, 300)
+    assert np.isfinite(V).all()
+
+    return V, observation_cell_idx
+
+
 def run_linguistic_experiment(df: DataFrame,
                               scheme: str,
                               model_name: str,
@@ -436,7 +471,7 @@ def run_linguistic_experiment(df: DataFrame,
             MODEL_DIR.mkdir(parents = True, exist_ok = True)
         joblib.dump({"model": model,
                     "vectorizer": vectorizer,
-                    "features": TFIDF_NUMERIC_FEATURES},
+                    "features": NUMERIC_FEATURES},
                     MODEL_DIR / "tfidf_temporal.joblib")
         print("Saved temporal TF-IDF model.")
 
@@ -460,41 +495,6 @@ def run_linguistic_experiment(df: DataFrame,
     print(f"Test AP: {result['test_ap']:.6f}")
 
     return result
-
-
-def prepare_fasttext(df: DataFrame) -> tuple[npt.NDArray[np.float32], npt.NDArray[np.int32]]:
-    """
-    Build FastText features for all cells.
-    
-    Parameters:
-        df: DataFrame
-            The data.
-    Returns:
-        NDArray
-            The FastText features for all cells (train + val + test).
-        npt.NDArray[np.int32]
-            A mapping from cell_id to the row index in the CSR matrix.
-    """
-    embeddings = pd.read_parquet(FASTTEXT_PATH)
-
-    assert embeddings["cell_id"].is_unique
-    assert set(df["cell_id"].unique()) == set(embeddings["cell_id"])
-
-    # Sort so cell_index will align with the rows of V later.
-    embeddings = embeddings.sort_values("cell_id").reset_index(drop = True)
-    # Create a stable mapping from cell_id to FastText feature.
-    cell_index = pd.Series(np.arange(len(embeddings),
-                                     dtype = np.int32),
-                                     index = embeddings["cell_id"])
-    observation_cell_idx = (df["cell_id"].map(cell_index).to_numpy(dtype = np.int32))
-    
-    # Put the FastText features in a dense NumPy array.
-    V = np.stack(embeddings["embedding"].to_numpy()).astype(np.float32)
-
-    assert V.shape == (4983, 300)
-    assert np.isfinite(V).all()
-
-    return V, observation_cell_idx
 
 
 if __name__ == "__main__":
