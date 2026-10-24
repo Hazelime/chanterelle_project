@@ -65,8 +65,11 @@ matched = positive_weeks[keys].merge(
 )
 unmatched = (matched["_merge"] == "left_only").sum()
 print(f"Unique observed cell-weeks: {len(positive_weeks):,}") # 10,316
-# 4 cell-weeks without weather are expected, since we used the last two weeks of 1994
-# to calculate data for the first week of 1995.
+# 4 cell-weeks without weather are expected, since there are 4 recorded observations in the
+# first few days of 1995. When converting weeks to ISO weeks, which start with Monday, these
+# observations end up belonging to the last week of 1994 rather than the first week of 1995.
+# Since we use ISO weeks for weather data, these observations will lack matching weather, even
+# though they are technically part of 1995.  
 print(f"Observed cell-weeks without weather: {unmatched:,}") # 4
 
 # Attach binary labels to the weather dataset: 1 for observation, 0 for non-observation.
