@@ -225,7 +225,7 @@ def plot_overall_ap(summary: DataFrame) -> None:
         ax.bar(labels, values)
         ax.set_title(scheme.capitalize())
         ax.set_ylabel("Test Average Precision")
-        ax.tick_params(axis = "x", rotation = 45)
+        ax.tick_params(axis = "x", rotation = 30, labelrotation_mode = "xtick")
 
     fig.suptitle("Model performance versus positive prevalence")
     plt.tight_layout()
