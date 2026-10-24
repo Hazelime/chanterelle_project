@@ -16,7 +16,7 @@ MODEL_PATH = Path("./results/models/tfidf_temporal.joblib")
 OUTPUT_DIR = Path("./results/tfidf_analysis")
 PLACENAMES_PATH = Path("./data/placenames/cell_placenames.parquet")
 # Handpicked patterns that are investigated more closely.
-PATTERNS = ["mad", "kull", "myr", "jávr", "lund", "holm"]
+PATTERNS = ["mad", "kull", "möll", "park", "myr", "jávr", "lund", "amoss", "holm"]
 
 TOP_N = 20
 
@@ -66,7 +66,7 @@ bundle = joblib.load(MODEL_PATH)
 model = bundle["model"]
 vectorizer = bundle["vectorizer"]
 feature_names = vectorizer.get_feature_names_out()
-coefficients = model.coef_tfidf_
+coefficients = model.coef_linguistic_
 
 assert len(feature_names) == len(coefficients)
 
@@ -94,11 +94,12 @@ df = pd.DataFrame({
 })
 
 df = df.sort_values("coefficient", ascending = False).reset_index(drop = True)
-
+# Replace spaces with underscores for better readability.
+df["ngram"] = df["ngram"].str.replace(" ", "_", regex = False)
 # ---------------- Placename pattern inspection ----------------
 inspect_placename_patterns(patterns = PATTERNS,
                            placenames_path = PLACENAMES_PATH,
-                           top_n = 15)
+                           top_n = 7)
 
 # ---------------- Save results ----------------
 OUTPUT_DIR.mkdir(parents = True, exist_ok = True)
