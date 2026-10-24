@@ -34,6 +34,11 @@ assert test["cell_id"].nunique() == 4983
 
 print(f"Loaded {len(test):,} test cell-weeks.")
 
+# ---------------- Historical observations ----------------
+historical = (df.groupby("cell_id", as_index = False)
+    .agg(historical_observed=("observation", "sum")))
+print("Historical positive cell-weeks:", f"{historical['historical_observed'].sum():,}")
+
 # ---------------- Load fitted models ----------------
 tfidf_bundle = joblib.load(TFIDF_MODEL_PATH)
 log_bundle = joblib.load(LOG_MODEL_PATH)
@@ -130,8 +135,10 @@ geometry = [box(x, y, x + CELL_SIZE, y + CELL_SIZE)
             for x, y in zip(grid["cell_x"], grid["cell_y"])]
 gdf = gpd.GeoDataFrame(grid[["cell_id"]], geometry = geometry, crs = "EPSG:3006")
 gdf = gdf.merge(cell_data, on = "cell_id", how = "left", validate = "one_to_one")
+gdf = gdf.merge(historical, on = "cell_id", how = "left", validate = "one_to_one")
 
 assert gdf["observed"].notna().all()
+assert gdf["historical_observed"].notna().all()
 
 # ---------------- Plotting helpers ----------------
 def plot_observations():
@@ -172,6 +179,40 @@ def plot_observations():
 
     fig.savefig(OUTPUT_DIR / "01_observed_2025.png", dpi = 200, bbox_inches = "tight")
     plt.close(fig)
+
+
+def plot_historical_observations():
+    """
+    Plots a map of all positive cells on the cell-grid, where cells with more positive
+    cell-weeks being more brightly colored.
+    """
+    colors = plt.get_cmap("viridis")(np.linspace(0, 1, 6))
+    cmap = ListedColormap(colors)
+    # Somewhat arbitrary color boundaries.
+    boundaries = [-0.5, 0.5, 2.5, 5.5, 10.5, 25.5, np.inf]
+    norm = BoundaryNorm(boundaries, ncolors = cmap.N)
+
+    fig, ax = plt.subplots(figsize = (9, 13))
+    gdf.plot(
+        column = "historical_observed",
+        ax = ax,
+        cmap = cmap,
+        norm = norm,
+        edgecolor = "none",
+        legend = False
+    )
+
+    labels = ["0", "1–2", "3–5", "6–10", "11–25", "26+"]
+    handles = [Patch(facecolor = colors[i], label = labels[i]) for i in range(len(labels))]
+    ax.legend(handles = handles, title = "Positive cell-weeks", loc = "lower right", frameon = False)
+    ax.set_title("Historical positive cell-weeks (1995–2025)", fontsize = 15, pad = 15)
+    ax.set_axis_off()
+    ax.set_aspect("equal")
+    plt.tight_layout()
+
+    fig.savefig(OUTPUT_DIR / "07_historical_observations.png", dpi = 200, bbox_inches = "tight")
+    plt.close(fig)
+
 
 def plot_map(column: str,
              title: str,
@@ -319,6 +360,8 @@ plot_map(
     norm = symlog_norm,
     label = "Difference in mean weekly log loss",
 )
+# Map 7: Historical observations 1995-2025
+plot_historical_observations()
 
 # ---------------- Summary ----------------
 print("\nFinished!")
@@ -357,5 +400,20 @@ for label in [0, 1]:
     print(f"Log-count loss: {log_loss:.8f}") # 0.00139331 vs. 5.07366371
     print(f"TF-IDF loss: {tfidf_loss:.8f}") # 0.00118650 vs. 5.02018195
     print(f"Difference: {tfidf_loss - log_loss:+.8f}") # -0.00020681 vs. -0.05348177
+
+print("\nHistorical observations per cell:")
+print(historical["historical_observed"].describe(percentiles = [0.5, 0.75, 0.90, 0.95, 0.99]))
+# count    4983.000000
+# mean        2.069436
+# std         7.276331
+# min         0.000000
+# 50%         0.000000
+# 75%         1.000000
+# 90%         5.000000
+# 95%        10.000000
+# 99%        29.000000
+# max       195.000000
+print(f"Cells with historical observations: {(historical['historical_observed'] > 0).sum():,}")
+# Cells with historical observations: 1,734
 
 print(f"\nMaps saved to: {OUTPUT_DIR}")
