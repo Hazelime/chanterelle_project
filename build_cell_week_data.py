@@ -2,6 +2,10 @@ import numpy as np
 import pandas as pd
 from pathlib import Path
 
+"""
+This script aggregates cell ID, forest coverage, weather, observation, placename, and week
+data in the joint, compressed data/processed/cell_week_dataset.parquet.
+"""
 
 # ---------------- Configuration ----------------
 WEATHER_PATH = Path("./data/weather/sweden_weekly_weather.parquet")

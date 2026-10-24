@@ -7,6 +7,11 @@ import numpy as np
 import numpy.typing as npt
 import pandas as pd
 
+"""
+This script generates cell-level FastText placename embeddings based on
+data/placenames/fasttext/cc.sv.300.bin and data/placenames/cell_placenames.parquet and
+then saves them as data/placenames/cell_fasttext_embeddings.parquet.
+"""
 
 # ---------------- Configuration ----------------
 MODEL_PATH = Path("./data/placenames/fasttext/cc.sv.300.bin")
@@ -15,7 +20,6 @@ OUTPUT_PATH = Path("./data/placenames/cell_fasttext_embeddings.parquet")
 
 EXPECTED_CELLS = 4983
 EMBEDDING_DIM = 300
-
 
 # ---------------- Load data ----------------
 print("Loading Swedish FastText model...")
@@ -43,7 +47,6 @@ def get_token_vector(token : str) -> npt.NDArray:
             The vector for the token.
     """
     return model.get_word_vector(token).astype(np.float32)
-
 
 # ---------------- Placename embeddings ----------------
 def embed_name(name: str) -> npt.NDArray | None:
@@ -107,7 +110,6 @@ def embed_cell(names: Sequence[str | None] | None) -> npt.NDArray:
         cell_vector /= norm
 
     return cell_vector
-
 
 # ---------------- Generate embeddings ----------------
 embeddings = []

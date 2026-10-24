@@ -3,6 +3,11 @@ import pandas as pd
 import xarray as xr
 from pathlib import Path
 
+"""
+This script calculates average temperature and total precipitation for the preceding
+week for all weeks during 1995-2025 using data from data/weather, aligns the result with
+the master grid, and saves it as data/sweden_weekly_weather.parquet.
+"""
 
 # --------------Configuration-----------------------
 DATA_DIR = Path("./data/weather")
@@ -15,8 +20,6 @@ OUTPUT_PATH = DATA_DIR / "sweden_weekly_weather.parquet"
 START_YEAR = 1995
 END_YEAR = 2025
 
-
-
 # -----------Load SMHI-to-grid mapping--------------
 mapping = pd.read_parquet(MAPPING_PATH)
 # Return_inverse = True makes np.unique additionally return an index of the cell ids
@@ -25,7 +28,6 @@ cell_ids, group_idx = np.unique(mapping["cell_id"].values, return_inverse = True
 
 n_cells = len(cell_ids)
 print(f"Loaded mapping for {n_cells:,} cells.") # 4983
-
 
 # -----------Daily spatial aggregation--------------
 def aggregate_year(year: int) -> DataFrame:
@@ -103,11 +105,10 @@ def aggregate_year(year: int) -> DataFrame:
 
     return pd.concat(rows, ignore_index = True)
 
-
 # ---------------Weekly aggregation-----------------
 def aggregate_weeks(daily_df: DataFrame) -> DataFrame:
     """
-    Aggregates the data by week and cell_id and then return useful weekly features.
+    Aggregates the data by week and cell_id and then returns useful weekly features.
     Weeks without complete data are NaN.
 
     Parameters:
@@ -156,7 +157,6 @@ def aggregate_weeks(daily_df: DataFrame) -> DataFrame:
     weekly["week"] = iso.week.astype("int8")
 
     return weekly[["cell_id", "year", "week", "temp_7d", "precip_7d"]]
-
 
 # ---------------Process all years------------------
 if __name__ == "__main__":
@@ -228,16 +228,10 @@ if __name__ == "__main__":
     result["temp_7d"] = (result["temp_7d"].astype("float32"))
     result["precip_7d"] = (result["precip_7d"].astype("float32"))
 
-    result = result.sort_values(
-        ["cell_id", "year", "week"]
-    ).reset_index(drop = True)
+    result = result.sort_values(["cell_id", "year", "week"]).reset_index(drop = True)
 
     # Save as a compressed Parquet file.
-    result.to_parquet(
-        OUTPUT_PATH,
-        compression = "zstd",
-        index = False
-    )
+    result.to_parquet(OUTPUT_PATH, compression = "zstd", index = False)
 
     print("\nFinished!")
     print("Rows:", len(result)) # 8057511

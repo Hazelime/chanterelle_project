@@ -6,6 +6,11 @@ from sklearn.preprocessing import StandardScaler
 
 from cell_feature_model import CellFeatureLogisticRegression
 
+"""
+This script tests whether the custom-made logistic-regression model produces similar results
+to Scikit-Learn's LogisticRegression model.
+"""
+
 # Create a synthetic dataset for testing whether my custom-made logistic regression
 # model produces similar results to Scikit-learn's logistic regression model.
 # If the maximum difference in prediction probabilities is < 1e-4, I consider the

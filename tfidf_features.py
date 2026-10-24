@@ -4,6 +4,10 @@ import pandas as pd
 from sklearn.feature_extraction.text import TfidfVectorizer
 from scipy.sparse import csr_matrix
 
+"""
+This script provides high-level functions for ftting a TF-IDF vectorizer and building
+TF-IDF features.
+"""
 
 # ---------------- Configuration ----------------
 # Character-level TF-IDF with n-grams of length 3-5 within word boundaries,

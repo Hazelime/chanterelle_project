@@ -7,6 +7,9 @@ from scipy.sparse import csr_matrix, issparse
 from sklearn.preprocessing import StandardScaler
 
 """
+This script provides a custom-made logistic-regression model class that handles recurring
+data more efficiently than Scikit-Learn's LogisticRegression.
+
 We want a custom logistic regression model for TF-IDF and FastText because Scikit-Learn's
 LogisticRegression works inefficiently when many of the 300+ features can be calculated once
 per cell instead of once per cell-week. For example, we can't just append 5,000 TF-iDF

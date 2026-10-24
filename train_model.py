@@ -18,6 +18,15 @@ from cell_feature_model import CellFeatureLogisticRegression
 
 import joblib
 
+"""
+This script trains and evaluates models based on user input. The available models are
+seasonality, environmental, placename_count, placename_count_log, tfidf, and fasttext.
+The available validation schemes are temporal, spatial, and spatiotemporal. Results are
+saved in the results folder and select models are saved in results/models.
+
+Sample usage:
+python3 train_model.py --model tfidf --scheme temporal
+"""
 
 # ---------------- Configuration ----------------
 DATA_PATH = Path("./data/processed/cell_week_dataset.parquet")

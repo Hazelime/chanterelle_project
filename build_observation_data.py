@@ -7,8 +7,14 @@ import numpy as np
 from pathlib import Path
 from pyproj import Transformer
 
+"""
+This script downloads chanterelle observations data from
+https://api.gbif.org/v1/occurrence/search, filters it to clean observations during
+1995-2025, aligns it with the master grid, and saves it to data/observations.parquet.
+"""
+
 # All the specific numbers in the comments below are from a run on 2026-10-20.
-# Where to get the chanterelle data
+# Where to get the chanterelle data:
 url = "https://api.gbif.org/v1/occurrence/search"
 raw_output_path = "./data/observations/raw_gbif_observations.parquet"
 filtered_output_path = "./data/observations/filtered_gbif_observations.parquet"
@@ -16,9 +22,7 @@ final_output_path = Path("./data/observations/observations.parquet")
 grid_path = Path("./data/sweden_master_grid.csv")
 cell_size = 10000 # Meters
 
-
-
-# ------------DOWNLOAD DATA------------
+# ------------ Download data ------------
 # Specify what to download: Swedish chantarelle observations.
 # The limit is set to 300, which is the maximum allowed by the API.
 params = {
@@ -82,9 +86,7 @@ observations.to_parquet(raw_output_path, index = False)
 print("Data saved to ", os.path.exists(raw_output_path))
 print("File size:", os.path.getsize(raw_output_path) / 1_000_000, "MB") # 3.552689 MB
 
-
-
-# ------------FILTER DATA------------ 
+# ------------ Filter data ------------ 
 # Remove observations with coordinate uncertainty values above 5 km (5000 m). 
 # This conveniently also filters out observations with missing coordinates, since NaN <= 5000 evaluates to False.
 observations_clean = observations[
@@ -134,7 +136,7 @@ observations_model.to_parquet(filtered_output_path, index = False)
 print("File exists:", os.path.exists(filtered_output_path))
 print("File size:", os.path.getsize(filtered_output_path) / 1_000_000, "MB") # 2.933045 MB
 
-# ------------ADD CELL ID------------ 
+# ------------Add cell id------------ 
 #obs = pd.read_parquet(filtered_output_path, columns = ["date", "decimalLongitude", "decimalLatitude"])
 obs = observations_model[["date", "decimalLongitude", "decimalLatitude"]]
 grid = pd.read_csv(grid_path, usecols = ["cell_id", "cell_x", "cell_y"])
@@ -145,9 +147,7 @@ print(f"Loaded {len(grid):,} grid cells.")
 # Check that all cell ids are unique before proceeding.
 assert grid["cell_id"].is_unique
 
-
 # ---------------- Validate input ----------------
-
 missing = obs[["date", "decimalLongitude", "decimalLatitude"]].isna().any(axis = 1)
 print(f"Observations with missing fields: {missing.sum():,}")
 
@@ -162,7 +162,6 @@ print(f"Invalid coordinates: {(~valid_coords).sum():,}")
 
 obs = obs.loc[valid_coords].copy()
 
-
 # ---------------- Spatial assignment ----------------
 # Transform data to the correct coordinate reference system (CRS): EPSG:3006.
 transformer = Transformer.from_crs("EPSG:4326", "EPSG:3006", always_xy = True)
@@ -176,17 +175,13 @@ cell_x = (np.floor(x / cell_size).astype(np.int64) * cell_size)
 cell_y = (np.floor(y / cell_size).astype(np.int64) * cell_size)
 obs["cell_id"] = [f"{cx}_{cy}" for cx, cy in zip(cell_x, cell_y)]
 
-
 # ---------------- Temporal assignment ----------------
-
 obs["date"] = pd.to_datetime(obs["date"], utc = True)
 iso = obs["date"].dt.isocalendar()
 obs["year"] = iso.year.astype("int16")
 obs["week"] = iso.week.astype("int8")
 
-
 # ---------------- Match against master grid ----------------
-
 valid_cell_ids = set(grid["cell_id"].astype(str))
 
 matched = obs["cell_id"].isin(valid_cell_ids)
@@ -197,13 +192,9 @@ print(f"Observations outside grid: {(~matched).sum():,}")
 # Drop the observations outside the grid.
 obs = obs.loc[matched].copy()
 
-
 # ---------------- Finalize ----------------
-
-result = obs[
-    ["cell_id", "date", "year", "week"]
-].sort_values(
-    ["cell_id", "date"]
+result = obs[["cell_id", "date", "year", "week"]
+].sort_values(["cell_id", "date"]
 ).reset_index(drop = True)
 
 assert result.notna().all().all()
@@ -213,9 +204,7 @@ final_output_path.parent.mkdir(parents = True, exist_ok = True)
 
 result.to_parquet(final_output_path, compression = "zstd", index = False)
 
-
 # ---------------- Summary ----------------
-
 print("\nFinished!")
 print(f"Rows: {len(result):,}")
 print(f"Unique cells: {result['cell_id'].nunique():,}")
@@ -224,11 +213,8 @@ print("\nObservations by year:")
 print(result.groupby("year").size().to_string())
 
 print("\nUnique positive cell-weeks:")
-print(
-    result[
-        ["cell_id", "year", "week"]
-    ].drop_duplicates().shape[0]
-)
+print(result[["cell_id", "year", "week"]
+    ].drop_duplicates().shape[0])
 
 size_mb = final_output_path.stat().st_size / (1024 ** 2)
 

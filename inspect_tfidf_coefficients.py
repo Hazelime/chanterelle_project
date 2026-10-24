@@ -5,6 +5,20 @@ import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 
+"""
+This script calculates top positive and negative TF-IDF features for all cells and saves
+the results in results/tfidf_analysis. Some handpicked patterns (mad, kull, myr, jábr,
+lund, and holm) are also analyzed more closely.
+"""
+
+# ---------------- Configuration ----------------
+MODEL_PATH = Path("./results/models/tfidf_temporal.joblib")
+OUTPUT_DIR = Path("./results/tfidf_analysis")
+PLACENAMES_PATH = Path("./data/placenames/cell_placenames.parquet")
+# Handpicked patterns that are investigated more closely.
+PATTERNS = ["mad", "kull", "myr", "jávr", "lund", "holm"]
+
+TOP_N = 20
 
 
 def inspect_placename_patterns(patterns: list, placenames_path: Path, top_n: int = 15) -> None:
@@ -46,16 +60,6 @@ def inspect_placename_patterns(patterns: list, placenames_path: Path, top_n: int
 
         print("\nMost frequent matching placenames:")
         print(matches["placenames"].value_counts().head(top_n).to_string())
-
-
-# ---------------- Configuration ----------------
-MODEL_PATH = Path("./results/models/tfidf_temporal.joblib")
-OUTPUT_DIR = Path("./results/tfidf_analysis")
-PLACENAMES_PATH = Path("./data/placenames/cell_placenames.parquet")
-# Handpicked patterns that are investigated more closely.
-PATTERNS = ["mad", "kull", "myr", "jávr", "lund", "holm"]
-
-TOP_N = 20
 
 # ---------------- Load model ----------------
 bundle = joblib.load(MODEL_PATH)

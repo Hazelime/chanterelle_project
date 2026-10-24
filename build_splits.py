@@ -3,6 +3,10 @@ import pandas as pd
 from pathlib import Path
 from sklearn.model_selection import train_test_split
 
+"""
+This script splits the data in data/processed/cell_week_dataset.parquet into temporal
+and spatial training, validation, and testing splits and saves the mappings in data/splits.
+"""
 
 # ---------------- Configuration ----------------
 GRID_PATH = Path("./data/sweden_master_grid.csv")

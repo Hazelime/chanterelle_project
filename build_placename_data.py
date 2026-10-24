@@ -4,6 +4,10 @@ import numpy as np
 import pandas as pd
 import geopandas as gpd
 
+"""
+This script extracts placename data from data/placenames/placenames_raw.gpkg and aligns it with the master
+grid, and saves it in data/placenames/cell_placenames.parquet.
+"""
 
 # ---------------- Configuration ----------------
 # Data originally comes from https://geotorget.lantmateriet.se/geodataprodukter/ortnamn-nedladdning-vektor-api
@@ -13,7 +17,6 @@ OUTPUT_PATH = Path("./data/placenames/cell_placenames.parquet")
 
 CELL_SIZE = 10000
 EXPECTED_CELLS = 4983
-
 
 # ---------------- Load data ----------------
 grid = pd.read_csv(GRID_PATH, usecols = ["cell_id"], dtype = {"cell_id": "str"})
@@ -36,7 +39,6 @@ print(f"Loaded {len(grid):,} grid cells.") # 4,983
 assert len(grid) == EXPECTED_CELLS
 assert grid["cell_id"].is_unique
 assert names.crs.to_epsg() == 3006
-
 
 # ---------------- Clean names ----------------
 # Remove missing or empty names.

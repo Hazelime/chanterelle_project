@@ -4,6 +4,11 @@ import xarray as xr
 
 from pyproj import CRS, Transformer
 
+"""
+This script creates a mapping from the SMHI 4 x 4 km grid to the 10 x 10 km master grid
+and saves it in data/weather/smhi_to_master_grid.parquet.
+"""
+
 # Paths (use the 1995 temperature data as an arbitrary choice)
 GRID_PATH = "./data/sweden_master_grid.csv"
 OUTPUT_PATH = "./data/weather/smhi_to_master_grid.parquet"
@@ -39,7 +44,6 @@ xx, yy = np.meshgrid(xs, ys)
 # Transform coordinates to EPSG:3006 (SWEREF99 TM)
 x_3006, y_3006 = transformer.transform(xx, yy)
 
-
 # ----------Map each SMHI coordinate to a grid cell---------
 # Assign each point to a 10 km master-grid cell
 cell_size = 10_000
@@ -61,7 +65,6 @@ mapping = pd.DataFrame({
 
 # Keep only cells in the master grid
 mapping = mapping[mapping["cell_id"].isin(grid["cell_id"])].copy()
-
 
 # ----------Address missing SMHI data---------
 # Two cells are missing SMHI data, so we replace them with their nearest neighbors.
@@ -86,7 +89,6 @@ new_rows = pd.DataFrame([
 ])
 # Ignore_index = True gives the combined DataFrame a fresh index
 mapping = pd.concat([mapping, new_rows], ignore_index = True)
-
 
 # ----------Check statistics, save, and close---------
 print("\nMapping rows:", len(mapping)) # 31151

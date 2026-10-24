@@ -15,6 +15,11 @@ from shapely.geometry import box
 from train_model import load_data, prepare_tfidf, NUMERIC_FEATURES
 from tfidf_features import build_documents
 
+"""
+This script plots various heatmaps based on the input and results data and saves them
+in results/maps.
+"""
+
 # ---------------- Configuration ----------------
 GRID_PATH = Path("./data/sweden_master_grid.csv")
 TFIDF_MODEL_PATH = Path("./results/models/tfidf_temporal.joblib")

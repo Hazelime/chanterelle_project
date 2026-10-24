@@ -4,6 +4,12 @@ import pandas as pd
 from rasterio.windows import Window
 from pathlib import Path
 
+"""
+This script builds the 10 x 10 km master grid using
+data/NMD2023och2018_basskikt_v0_3/NMD2023och2018bas_v0_3.tif, calculates forest coverage
+for each cell, and saves the data as data/sweden_master_grid.csv
+"""
+
 # In NMD2023, these are the relevant codes:
 # 0 = Utanför karteringsområde (outside mapping area)
 # 23 = Låg fjällskog på våtmark (low mountain forest on wetlands)
@@ -18,7 +24,7 @@ FOREST_CLASSES = 23, 43, 110, 120
 WATER_CLASSES = 61, 62
 CELL_SIZE = 10000
 CHUNK_SIZE = 4000 # Processing window size in raster pixels, as recommended by ChatGPT Edu
-RASTER_PATH = Path("NMD2023och2018_basskikt_v0_3/NMD2023och2018bas_v0_3.tif")
+RASTER_PATH = Path("./data/NMD2023och2018_basskikt_v0_3/NMD2023och2018bas_v0_3.tif")
 OUTPUT_PATH = Path("./data/sweden_master_grid.csv")
 
 

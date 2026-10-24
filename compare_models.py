@@ -5,15 +5,23 @@ import pandas as pd
 import matplotlib.pyplot as plt
 from pandas import DataFrame
 
+"""
+This script compares statistics from tested models in the results folder and plots relevant
+diagrams. Comparison statistics are saved in the results folder and the diagrams are saved
+in results/figures.
+"""
 
 # ---------------- Configuration ----------------
 RESULT_DIR = Path("./results")
 FIGURE_DIR = RESULT_DIR / "figures"
 
 SCHEMES = ["temporal", "spatial", "spatiotemporal"]
-
-MODEL_ORDER = ["seasonality", "environmental", "placename_count", "placename_count_log", "tfidf", "fasttext"]
-
+MODEL_ORDER = ["seasonality",
+               "environmental",
+               "placename_count",
+               "placename_count_log",
+               "tfidf",
+               "fasttext"]
 COMPARISONS = [
     ("seasonality", "environmental"),
     ("environmental", "placename_count"),
@@ -21,7 +29,6 @@ COMPARISONS = [
     ("placename_count_log", "tfidf"),
     ("placename_count_log", "fasttext")
 ]
-
 
 def load_results() -> DataFrame:
     """
