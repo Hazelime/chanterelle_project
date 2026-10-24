@@ -31,9 +31,10 @@ C = 0.1
 
 # Test the custom-made model. Note that this tol is ftol, i.e. tolerance based on
 # relative improvement in the objective function.
-custom = CellFeatureLogisticRegression(C = C, max_iter = 2000, tol = 1e-12)
+custom = CellFeatureLogisticRegression(C = C, max_iter = 1000, tol = 1e-8)
 custom.fit(X, cell_idx, V, y)
 p_custom = custom.predict_proba(X, cell_idx, V)[:, 1]
+custom_coef = np.concatenate([custom.coef_numeric_, custom.coef_linguistic_,])
 
 # Build an expanded matrix for fair comparison
 scaler = StandardScaler()
@@ -41,15 +42,23 @@ X_scaled = scaler.fit_transform(X)
 X_full = hstack([csr_matrix(X_scaled), V[cell_idx]], format = "csr")
 
 # Test Scikit-learn's model. Note that this tol is gtol, i.e. tolerance based on a
-# gradient-based convergence criterion.
-reference = LogisticRegression(C = C, solver = "lbfgs", max_iter = 2000, tol = 1e-9)
+# gradient-based convergence criterion. Using a higher tolerance than the default
+# 1e-5 is fine here since it is the performance of the custom model we are interested in.
+reference = LogisticRegression(C = C, solver = "lbfgs", max_iter = 1000, tol = 1e-8)
 reference.fit(X_full, y)
 p_reference = reference.predict_proba(X_full)[:, 1]
+reference_coef = reference.coef_.ravel()
 
 max_difference = np.max(np.abs(p_custom - p_reference))
 
 print("Custom convergence:", custom.success_)
 print("Maximum probability difference:", max_difference)
+
+print("Custom iterations:", custom.n_iter_)
+print("Reference iterations:", reference.n_iter_[0])
+
+print("Maximum coefficient difference:", np.max(np.abs(custom_coef - reference_coef)))
+print("Mean probability difference:", np.mean(np.abs(p_custom - p_reference)))
 
 assert max_difference < 1e-4
 print("Test passed.")
