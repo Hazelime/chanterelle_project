@@ -4,7 +4,7 @@ from scipy.sparse import csr_matrix, hstack
 from sklearn.linear_model import LogisticRegression
 from sklearn.preprocessing import StandardScaler
 
-from tfidf_model import CellTfidfLogisticRegression
+from cell_feature_model import CellFeatureLogisticRegression
 
 # Create a synthetic dataset for testing whether my custom-made logistic regression
 # model produces similar results to Scikit-learn's logistic regression model.
@@ -26,7 +26,7 @@ C = 0.1
 
 # Test the custom-made model. Note that this tol is ftol, i.e. tolerance based on
 # relative improvement in the objective function.
-custom = CellTfidfLogisticRegression(C = C, max_iter = 2000, tol = 1e-12)
+custom = CellFeatureLogisticRegression(C = C, max_iter = 2000, tol = 1e-12)
 custom.fit(X, cell_idx, V, y)
 p_custom = custom.predict_proba(X, cell_idx, V)[:, 1]
 
