@@ -22,8 +22,10 @@ in results/maps.
 
 # ---------------- Configuration ----------------
 GRID_PATH = Path("./data/sweden_master_grid.csv")
-TFIDF_MODEL_PATH = Path("./results/models/tfidf_temporal.joblib")
 LOG_MODEL_PATH = Path("./results/models/placename_count_log_temporal.joblib")
+TFIDF_MODEL_PATH = Path("./results/models/tfidf_temporal.joblib")
+FASTTEXT_MODEL_PATH = Path("./results/models/fasttext_temporal.joblib")
+FASTTEXT_EMBEDDINGS_PATH = Path("./data/placenames/cell_fasttext_embeddings.parquet")
 OUTPUT_DIR = Path("./results/maps")
 
 CELL_SIZE = 10000
@@ -45,14 +47,17 @@ historical = (df.groupby("cell_id", as_index = False)
 print("Historical positive cell-weeks:", f"{historical['historical_observed'].sum():,}")
 
 # ---------------- Load fitted models ----------------
-tfidf_bundle = joblib.load(TFIDF_MODEL_PATH)
 log_bundle = joblib.load(LOG_MODEL_PATH)
-
-tfidf_model = tfidf_bundle["model"]
-tfidf_vectorizer = tfidf_bundle["vectorizer"]
+tfidf_bundle = joblib.load(TFIDF_MODEL_PATH)
+fasttext_bundle = joblib.load(FASTTEXT_MODEL_PATH)
 
 log_model = log_bundle["model"]
+tfidf_model = tfidf_bundle["model"]
+fasttext_model = fasttext_bundle["model"]
+
 log_features = log_bundle["features"]
+tfidf_vectorizer = tfidf_bundle["vectorizer"]
+fasttext_features = fasttext_bundle["features"]
 
 # ---------------- Log-count predictions ----------------
 print("Generating log-count predictions...")
@@ -74,7 +79,6 @@ cell_index = pd.Series(np.arange(len(documents),
                        dtype = np.int32),
                        index = documents["cell_id"])
 test_cell_idx = (test["cell_id"].map(cell_index).to_numpy(dtype = np.int32))
-
 assert (test_cell_idx >= 0).all()
 
 # Use the saved training-fitted vectorizer (instead of fitting the TF-IDF vectorizer again).
@@ -83,6 +87,32 @@ V = tfidf_vectorizer.transform(documents["document"]).tocsr()
 # Get positive predictions (1)
 X_tfidf = test[NUMERIC_FEATURES].to_numpy(dtype = np.float32)
 test["p_tfidf"] = tfidf_model.predict_proba(X_tfidf, test_cell_idx, V)[:, 1]
+
+# ---------------- FastText predictions ----------------
+print("Generating FastText predictions...")
+
+# Reconstruct the same sorted cell order used when fitting the temporal FastText model.
+embeddings = pd.read_parquet(FASTTEXT_EMBEDDINGS_PATH)
+assert embeddings["cell_id"].is_unique
+
+# Sort so cell_index will align with the rows of V later.
+embeddings = (embeddings.sort_values("cell_id").reset_index(drop = True))
+# Create a stable mapping from cell_id to FastText feature.
+cell_index = pd.Series(np.arange(len(embeddings),
+                       dtype = np.int32),
+                       index = embeddings["cell_id"])
+test_cell_idx = (test["cell_id"].map(cell_index))
+assert test_cell_idx.notna().all()
+test_cell_idx = test_cell_idx.to_numpy(dtype = np.int32)
+
+# Construct the cell-level embedding matrix.
+V_fasttext = np.stack(embeddings["embedding"].to_numpy()).astype(np.float32)
+assert V_fasttext.shape == (4983, 300)
+assert np.isfinite(V_fasttext).all()
+
+# Get positive predictions (1)
+X_fasttext = test[fasttext_features].to_numpy(dtype = np.float32)
+test["p_fasttext"] = fasttext_model.predict_proba(X_fasttext, test_cell_idx, V_fasttext)[:, 1]
 
 # ---------------- Cell-week log loss ----------------
 def binary_log_loss(y: npt.NDArray, p: npt.NDArray) ->  npt.NDArray:
@@ -113,8 +143,10 @@ cell_data = (test.groupby("cell_id", as_index = False)
         observed = ("observation", "sum"),
         expected_log = ("p_log", "sum"),
         expected_tfidf = ("p_tfidf", "sum"),
+        expected_fasttext=("p_fasttext", "sum"),
         mean_p_log = ("p_log", "mean"),
         mean_p_tfidf = ("p_tfidf", "mean"),
+        mean_p_fasttext=("p_fasttext", "mean"),
         mean_loss_log = ("loss_log", "mean"),
         mean_loss_tfidf = ("loss_tfidf", "mean"),
         weeks = ("observation", "size")))
@@ -303,9 +335,10 @@ print("Generating maps...")
 plot_observations()
 
 # Map 2: Log-count predictions
-# Use the same color scale for maps 2 and 3.
+# Use the same color scale for maps 2, 3, and 8.
 all_predictions = np.concatenate([gdf["mean_p_log"].to_numpy(),
-                                  gdf["mean_p_tfidf"].to_numpy()])
+                                  gdf["mean_p_tfidf"].to_numpy(),
+                                  gdf["mean_p_fasttext"].to_numpy()])
 shared_max = np.percentile(all_predictions, 99)
 plot_map(
     "mean_p_log",
@@ -367,6 +400,16 @@ plot_map(
 )
 # Map 7: Historical observations 1995-2025
 plot_historical_observations()
+# Map 3: FastText predictions
+plot_map(
+    "mean_p_fasttext",
+    "FastText predicted probability (2025)",
+    "08_fasttext_predictions_2025.png",
+    cmap = "viridis",
+    vmin = 0,
+    vmax = shared_max,
+    label = "Mean weekly probability",
+)
 
 # ---------------- Summary ----------------
 print("\nFinished!")
@@ -375,6 +418,7 @@ print(f"Cells: {len(cell_data):,}") # 4,983
 print(f"Observed positives: {cell_data['observed'].sum():,}") # 652
 print(f"Expected positives (log count): {cell_data['expected_log'].sum():.1f}") # 364.6
 print(f"Expected positives (TF-IDF): {cell_data['expected_tfidf'].sum():.1f}") # 314.2
+print(f"Expected positives (FastText): {cell_data['expected_fasttext'].sum():.1f}") # 342.1
 
 print("\nLog-loss comparison:")
 print(f"Mean log loss (log count): {test['loss_log'].mean():.8f}") # 0.01415640

@@ -474,15 +474,27 @@ def run_linguistic_experiment(df: DataFrame,
     val_scores = model.predict_proba(X_val, idx_val, V)[:, 1]
     test_scores = model.predict_proba(X_test, idx_test, V)[:, 1]
 
-    # Save the TF-IDF temporal model (which covers all cells) for coefficient analysis.
-    if model_name == "tfidf":
+    # Save the temporal models (which covers all cells) for further analysis.
+    if scheme == "temporal":
+        MODEL_DIR.mkdir(parents = True, exist_ok = True)
+        if model_name == "tfidf":
+            joblib.dump({"model": model,
+                        "vectorizer": vectorizer,
+                        "features": NUMERIC_FEATURES},
+                        MODEL_DIR / "tfidf_temporal.joblib")
+        elif model_name == "fasttext":
+            joblib.dump({"model": model,
+                         "features": NUMERIC_FEATURES},
+                        MODEL_DIR / "fasttext_temporal.joblib")
+        print(f"Saved temporal {model_name} model.")
+    """if model_name == "tfidf":
         if scheme == "temporal":
             MODEL_DIR.mkdir(parents = True, exist_ok = True)
         joblib.dump({"model": model,
                     "vectorizer": vectorizer,
                     "features": NUMERIC_FEATURES},
                     MODEL_DIR / "tfidf_temporal.joblib")
-        print("Saved temporal TF-IDF model.")
+        print("Saved temporal TF-IDF model.")"""
 
     result = {
         "scheme": scheme,
