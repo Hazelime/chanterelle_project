@@ -31,6 +31,6 @@ To replicate the experiment in the study, the following usage/build order is rec
 12. **train_model.py** – Trains and evaluates models based on user input. The available models are seasonality, environmental, placename_count, placename_count_log, tfidf, and fasttext. The available validation schemes are temporal, spatial, and spatiotemporal. Results are saved in the ./results folder and select models are saved in ./results/models.
 
 ## Evaluation
-10. **compare_models.py** – Compares statistics from tested models in the results folder and plots relevant diagrams. Comparison statistics are saved in the ./results folder and the diagrams are saved in ./results/figures.
-11. **inspect_tfidf_coefficients.py** – Calculates top positive and negative TF-IDF features for all cells and saves the results in ./results/tfidf_analysis. Some handpicked patterns (mad, kull, myr, jábr, lund, and holm) are also analyzed more closely.
+10. **compare_models.py** – Compares statistics from tested models in the ./results folder and plots relevant diagrams. Comparison statistics are saved in the ./results folder and the diagrams are saved in ./results/figures.
+11. **inspect_tfidf_coefficients.py** – Calculates top positive and negative TF-IDF features for all cells and saves the results in ./results/tfidf_analysis. Some handpicked patterns (e.g. mad, kull, myr, and jávr) are also analyzed more closely.
 12. **plot_temporal_predictions.py** – Plots various heatmaps based on the input and results data and saves them in ./results/maps.
