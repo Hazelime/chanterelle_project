@@ -6,7 +6,8 @@ In order to use the full repository as intended, the following preliminary steps
 1. Download the environmental 10 x 10 m raster of Sweden (4.80 GB) from https://geodatakatalogen.naturvardsverket.se/geonetwork/srv/swe/catalog.search#/metadata/8853721d-a466-4c01-afcc-9eae57b17b39  and put it in ./data/NMD2023oct2018_basskikt_v0_3.
 2. Download daily 4 x 4 km Swedish precipitation and temperature data for 1994-2025 (8.68 GB) from https://www.smhi.se/data/nederbord-och-fuktighet/nederbord/griddad-nederbord--och-temperaturdata and put it in ./data/weather/precipitation and ./data/weather/temperature, respectively.
 3. Download Swedish place name data (152 MB) from https://www.lantmateriet.se/sv/geodata/vara-produkter/produktlista/ortnamn-nedladdning-vektor and put it in ./data/placenames/placenames_raw.gpkg.
-4. Download the pre-trained Swedish fastText embedding model (7.06 GB) from https://fasttext.cc/docs/en/crawl-vectors.html and put it in ./data/placenames/fasttext/cc.sv.300.bin
+4. Download the pre-trained Swedish fastText embedding model (7.06 GB) from https://fasttext.cc/docs/en/crawl-vectors.html and put it in ./data/placenames/fasttext/cc.sv.300.bin.
+5. Make sure these non-standard Python libraries are installed: numpy, pandas, geopandas, fasttext, rasterio, pyarrow, pyproj, sklearn, xarray, scipy, matplotlib, joblib, and shapely.
 
 # Build Order
 To replicate the experiment in the study, the following usage/build order is recommended:
