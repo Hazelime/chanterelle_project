@@ -9,7 +9,7 @@ In order to use the full repository as intended, the following preliminary steps
 4. Download the pre-trained Swedish fastText embedding model (7.06 GB) from https://fasttext.cc/docs/en/crawl-vectors.html and put it in ./data/placenames/fasttext/cc.sv.300.bin.
 5. Make sure these non-standard Python libraries are installed: numpy, pandas, geopandas, fasttext, rasterio, pyarrow, pyproj, sklearn, xarray, scipy, matplotlib, joblib, and shapely.
 
-# Build Order
+# Script Order
 To replicate the experiment in the study, the following usage/build order is recommended:
 
 ## Building Basic Data
