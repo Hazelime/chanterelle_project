@@ -12,24 +12,24 @@ In order to use the full repository as intended, the following preliminary steps
 To replicate the experiment in the study, the following usage/build order is recommended:
 
 ## Building Basic Data
-1. build_grid.py – Builds the 10 x 10 km master grid using ./data/NMD2023och2018_basskikt_v0_3/NMD2023och2018bas_v0_3.tif, calculates forest coverage for each cell, and saves the data as ./data/sweden_master_grid.csv
-2. smhi_to_grid_mapping.py – Creates a mapping from the SMHI 4 x 4 km grid to the 10 x 10 km master grid and saves it in ./data/weather/smhi_to_master_grid.parquet.
-3. build_weekly_weather.py – Calculates average temperature and total precipitation for the preceding weeks for all weeks during 1995-2025 using data from ./data/weather, aligns the result with the master grid, and saves it as ./data/sweden_weekly_weather.parquet.
-4. build_observation_data.py – Downloads chanterelle observations data from https://api.gbif.org/v1/occurrence/search, filters it to clean observations during 1995-2025, aligns it with the master grid, and saves it to ./data/observations.parquet.
-5. build_placename_data.py – Extracts placename data from ./data/placenames/placenames_raw.gpkg, aligns it with the master grid, and saves it in ./data/placenames/cell_placenames.parquet.
-6. build_cell_week_data.py – Aggregates cell ID, forest coverage, weather, observation, placename, and week data in the joint, compressed ./data/processed/cell_week_dataset.parquet.
+1. **build_grid.py** – Builds the 10 x 10 km master grid using ./data/NMD2023och2018_basskikt_v0_3/NMD2023och2018bas_v0_3.tif, calculates forest coverage for each cell, and saves the data as ./data/sweden_master_grid.csv
+2. **smhi_to_grid_mapping.py** – Creates a mapping from the SMHI 4 x 4 km grid to the 10 x 10 km master grid and saves it in ./data/weather/smhi_to_master_grid.parquet.
+3. **build_weekly_weather.py** – Calculates average temperature and total precipitation for the preceding weeks for all weeks during 1995-2025 using data from ./data/weather, aligns the result with the master grid, and saves it as ./data/sweden_weekly_weather.parquet.
+4. **build_observation_data.py** – Downloads chanterelle observations data from https://api.gbif.org/v1/occurrence/search, filters it to clean observations during 1995-2025, aligns it with the master grid, and saves it to ./data/observations.parquet.
+5. **build_placename_data.py** – Extracts placename data from ./data/placenames/placenames_raw.gpkg, aligns it with the master grid, and saves it in ./data/placenames/cell_placenames.parquet.
+6. **build_cell_week_data.p**y – Aggregates cell ID, forest coverage, weather, observation, placename, and week data in the joint, compressed ./data/processed/cell_week_dataset.parquet.
 
 ## Building Complex Data
-7. tfidf_features.py – Provides high-level functions for fitting a TF-IDF vectorizer and building TF-IDF features.
-8. build_fasttext_embeddings.py – Generates cell-level FastText placename embeddings based on ./data/placenames/fasttext/cc.sv.300.bin and ./data/placenames/cell_placenames.parquet and then saves them as ./data/placenames/cell_fasttext_embeddings.parquet.
+7. **tfidf_features.py** – Provides high-level functions for fitting a TF-IDF vectorizer and building TF-IDF features.
+8. **build_fasttext_embeddings.py** – Generates cell-level FastText placename embeddings based on ./data/placenames/fasttext/cc.sv.300.bin and ./data/placenames/cell_placenames.parquet and then saves them as ./data/placenames/cell_fasttext_embeddings.parquet.
 
 ## Training Models
-9. cell_feature_model.py – Provides a custom-made logistic-regression model class that handles recurring data more efficiently than Scikit-Learn's LogisticRegression.
-10. test_cell_feature_model.py – Tests whether the custom-made logistic-regression model produces similar results to Scikit-Learn's LogisticRegression model.
-11. build_splits.py – Splits the data in ./data/processed/cell_week_dataset.parquet into temporal and spatial training, validation, and testing splits and saves the mappings in ./data/splits.
-12. train_model.py – Trains and evaluates models based on user input. The available models are seasonality, environmental, placename_count, placename_count_log, tfidf, and fasttext. The available validation schemes are temporal, spatial, and spatiotemporal. Results are saved in the ./results folder and select models are saved in ./results/models.
+9. **cell_feature_model.py** – Provides a custom-made logistic-regression model class that handles recurring data more efficiently than Scikit-Learn's LogisticRegression.
+10. **test_cell_feature_model.py** – Tests whether the custom-made logistic-regression model produces similar results to Scikit-Learn's LogisticRegression model.
+11. **build_splits.py** – Splits the data in ./data/processed/cell_week_dataset.parquet into temporal and spatial training, validation, and testing splits and saves the mappings in ./data/splits.
+12. **train_model.py** – Trains and evaluates models based on user input. The available models are seasonality, environmental, placename_count, placename_count_log, tfidf, and fasttext. The available validation schemes are temporal, spatial, and spatiotemporal. Results are saved in the ./results folder and select models are saved in ./results/models.
 
 ## Evaluation
-10. compare_models.py – Compares statistics from tested models in the results folder and plots relevant diagrams. Comparison statistics are saved in the ./results folder and the diagrams are saved in ./results/figures.
-11. inspect_tfidf_coefficients.py – Calculates top positive and negative TF-IDF features for all cells and saves the results in ./results/tfidf_analysis. Some handpicked patterns (mad, kull, myr, jábr, lund, and holm) are also analyzed more closely.
-12. plot_temporal_predictions.py – Plots various heatmaps based on the input and results data and saves them in ./results/maps.
+10. **compare_models.py** – Compares statistics from tested models in the results folder and plots relevant diagrams. Comparison statistics are saved in the ./results folder and the diagrams are saved in ./results/figures.
+11. **inspect_tfidf_coefficients.py** – Calculates top positive and negative TF-IDF features for all cells and saves the results in ./results/tfidf_analysis. Some handpicked patterns (mad, kull, myr, jábr, lund, and holm) are also analyzed more closely.
+12. **plot_temporal_predictions.py** – Plots various heatmaps based on the input and results data and saves them in ./results/maps.
