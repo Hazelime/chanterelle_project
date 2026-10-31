@@ -23,7 +23,6 @@ class CellFeatureLogisticRegression:
     Logistic regression where cell-level feature vectors (TF-IDF, FastText) are not
     repeated across observations. Uses L2 regularization and SciPy L-BFGS-B.
     """
-
     def __init__(self, C: float = 1.0, max_iter: int = 1000, tol: float = 1e-8):
         self.C = C # Regularization strength
         # For the default max_iter and tol, I also tested (300, 1e-5) and (1500, 1e-10).
@@ -252,7 +251,7 @@ class CellFeatureLogisticRegression:
                       cell_idx: npt.NDArray[np.int32],
                       V: csr_matrix = None) -> npt.NDArray:
         """
-        Predict probabilities based on the fitted model. # The equations are essentially
+        Predict probabilities based on the fitted model. The equations are essentially
         the same as in objective(), but now we're not learning anything.
 
         Paramters:
