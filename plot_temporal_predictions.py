@@ -242,6 +242,7 @@ def plot_historical_observations():
     labels = ["0", "1–2", "3–5", "6–10", "11–25", "26+"]
     handles = [Patch(facecolor = colors[i], label = labels[i]) for i in range(len(labels))]
     ax.legend(handles = handles, title = "Positive cell-weeks", loc = "lower right", frameon = False)
+    #ax.legend(handles = handles, loc = "upper left", frameon = False, fontsize = 20)
     ax.set_title("Historical positive cell-weeks (1995–2025)", fontsize = 15, pad = 15)
     ax.set_axis_off()
     ax.set_aspect("equal")
