@@ -201,7 +201,6 @@ def plot_overall_ap(summary: DataFrame) -> None:
             A Pandas DataFrame containing the statistics for various models and schemes.
     """
     models = [m for m in MODEL_ORDER if m in summary["model"].unique()]
-    #models = ["environmental", "placename_count_log", "tfidf", "fasttext"]
 
     # Squeeze = False makes subplots() return an array rather than a single Axes object.
     fig, axes = plt.subplots(
