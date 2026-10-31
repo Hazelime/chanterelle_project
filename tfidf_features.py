@@ -34,7 +34,7 @@ def build_documents(cell_placenames: DataFrame) -> DataFrame:
     Returns:
         DataFrame
             A Pandas DataFrame containing cell_id and document columns, where
-            document is a string joining the unique placenames in a cell.
+            each document is a string joining the unique placenames in a cell.
     """
     documents = cell_placenames[["cell_id", "placenames"]].copy()
 
